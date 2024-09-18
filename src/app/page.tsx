@@ -15,21 +15,54 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Mic, Sun, Moon, Trash2 } from 'lucide-react'
 import { Switch } from "@/components/ui/switch"
 
+// Define types for chat messages
+type ChatMessage = {
+  type: 'user' | 'bot'
+  text: string
+}
+// Define the SpeechRecognition interface
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  start(): void;
+  stop(): void;
+  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void) | null;
+  onend: ((this: SpeechRecognition, ev: Event) => void) | null;
+}
+
+// Define the SpeechRecognitionEvent interface
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+}
+
+// Extend the Window interface to include SpeechRecognition
+declare global {
+  interface Window {
+    SpeechRecognition: {
+      new(): SpeechRecognition;
+    };
+    webkitSpeechRecognition: {
+      new(): SpeechRecognition;
+    };
+  }
+}
 export default function Component() {
-  const [chatHistory, setChatHistory] = useState([])
-  const [textInput, setTextInput] = useState('')
-  const [preferenceInput, setPreferenceInput] = useState('')
-  const [personalities, setPersonalities] = useState([])
-  const [currentPersonality, setCurrentPersonality] = useState('')
-  const [selectedCharacter, setSelectedCharacter] = useState('')
-  const [characters, setCharacters] = useState({})
-  const [isAISpeaking, setIsAISpeaking] = useState(false)
-  const [isListening, setIsListening] = useState(false)
-  const [isDarkTheme, setIsDarkTheme] = useState(false)
-  const [isHorizontal, setIsHorizontal] = useState(false)
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
+  const [textInput, setTextInput] = useState<string>('')
+  const [preferenceInput, setPreferenceInput] = useState<string>('')
+  const [personalities, setPersonalities] = useState<string[]>([])
+  const [currentPersonality, setCurrentPersonality] = useState<string>('')
+  const [selectedCharacter, setSelectedCharacter] = useState<string>('')
+  const [characters, setCharacters] = useState<{ [key: string]: string }>({})
+  const [isAISpeaking, setIsAISpeaking] = useState<boolean>(false)
+  const [isListening, setIsListening] = useState<boolean>(false)
+  const [isDarkTheme, setIsDarkTheme] = useState<boolean>(false)
+  const [isHorizontal, setIsHorizontal] = useState<boolean>(false)
   const router = useRouter()
-  const videoRef = useRef(null)
-  const recognitionRef = useRef(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
 
   const videoUrls = [
     "https://cdn.glitch.global/d02f8f67-1720-48fe-907d-c70042503ba5/coffee_woman_ai_resting.mp4?v=1713548715874",
@@ -58,6 +91,7 @@ export default function Component() {
     handleResize()
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
+    // Add missing dependencies
   }, [router])
 
   const initializeSpeechRecognition = () => {
@@ -69,7 +103,7 @@ export default function Component() {
       recognitionRef.current.interimResults = false
       recognitionRef.current.maxAlternatives = 1
 
-      recognitionRef.current.onresult = (event) => {
+      recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
         const transcript = event.results[0][0].transcript
         setTextInput(transcript)
         handleSubmit(transcript)
@@ -81,7 +115,9 @@ export default function Component() {
     }
   }
 
-  const fetchPersonalities = async (token) => {
+
+
+  const fetchPersonalities = async (token: string) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/get-all-personalities`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -98,7 +134,7 @@ export default function Component() {
     }
   }
 
-  const fetchCurrentPersonality = async (token) => {
+  const fetchCurrentPersonality = async (token: string) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/get-current-user-gf-personality`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -112,14 +148,14 @@ export default function Component() {
     }
   }
 
-  const fetchCharacters = async (token) => {
+  const fetchCharacters = async (token: string) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/get-all-characters`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       const data = await response.json()
       if (data.length > 0) {
-        const characterMap = data.reduce((acc, char) => {
+        const characterMap = data.reduce((acc: { [key: string]: string }, char: string) => {
           acc[char] = `https://example.com/${char.toLowerCase().replace(' ', '_')}.mp4`
           return acc
         }, {})
@@ -135,7 +171,7 @@ export default function Component() {
   }
 
   const setDefaultCharacters = () => {
-    const placeholderCharacters = {
+    const placeholderCharacters: { [key: string]: string } = {
       'Coffee Woman': videoUrls[0],
       'Office Man': 'https://example.com/office_man.mp4',
       'Student': 'https://example.com/student.mp4'
@@ -144,14 +180,20 @@ export default function Component() {
     setSelectedCharacter('Coffee Woman')
   }
 
-  const loadInitialChatHistory = async (token) => {
+  const loadInitialChatHistory = async (token: string) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/get-history`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
+      if (response.status === 401) {
+        alert('Session expired. Please log in again.')
+        localStorage.removeItem('token')
+        router.push('/login')
+        return
+      }
       const data = await response.json()
       if (data && data.history) {
-        setChatHistory(data.history.map(msg => ({
+        setChatHistory(data.history.map((msg: { role: string; content: string }) => ({
           type: msg.role === 'user' ? 'user' : 'bot',
           text: msg.content
         })))
@@ -161,9 +203,9 @@ export default function Component() {
     }
   }
 
-  const handleSubmit = async (input = textInput) => {
+  const handleSubmit = async (input: string = textInput) => {
     if (input.trim() && !isAISpeaking) {
-      setChatHistory(prev => [...prev, { type: 'user', text: input }])
+      setChatHistory((prev) => [...prev, { type: 'user', text: input }])
       try {
         const token = localStorage.getItem('token')
         const response = await fetch(`${API_BASE_URL}/api/generate-lipsync`, {
@@ -182,9 +224,9 @@ export default function Component() {
           })
         })
         const data = await response.json()
-        console.log("Server response:", data) // Log the entire response
+        console.log("Server response:", data)
         if (data.chatGptResponse) {
-          setChatHistory(prev => [...prev, { type: 'bot', text: data.chatGptResponse }])
+          setChatHistory((prev) => [...prev, { type: 'bot', text: data.chatGptResponse }])
           if (data.audio_id) {
             handleAISpeech(data.audio_id)
           } else {
@@ -195,15 +237,19 @@ export default function Component() {
         }
       } catch (error) {
         console.error("Error generating response:", error)
-        setChatHistory(prev => [...prev, { type: 'bot', text: "Sorry, I couldn't process that request." }])
+        setChatHistory((prev) => [...prev, { type: 'bot', text: "Sorry, I couldn't process that request." }])
       }
       setTextInput('')
     }
   }
 
-  const handleAISpeech = async (audioId) => {
+  const handleAISpeech = async (audioId: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/audio/${audioId}`)
+      const response = await fetch(`${API_BASE_URL}/api/audio/${audioId}`, {
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        }
+      })
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -227,14 +273,14 @@ export default function Component() {
         console.log("Audio playback ended")
         setIsAISpeaking(false)
         updateVideoSource(videoUrls[0])
-        URL.revokeObjectURL(audioUrl) // Clean up the object URL
+        URL.revokeObjectURL(audioUrl)
       })
 
       audioPlayer.addEventListener('error', (e) => {
         console.error("Audio playback error:", e)
         setIsAISpeaking(false)
         updateVideoSource(videoUrls[0])
-        URL.revokeObjectURL(audioUrl) // Clean up the object URL
+        URL.revokeObjectURL(audioUrl)
       })
 
       await audioPlayer.play()
@@ -244,7 +290,7 @@ export default function Component() {
     }
   }
 
-  const updateVideoSource = (newSrc) => {
+  const updateVideoSource = (newSrc: string) => {
     if (videoRef.current) {
       videoRef.current.src = newSrc
       videoRef.current.load()
@@ -270,7 +316,7 @@ export default function Component() {
         const data = await response.json()
         alert(data.message)
         setPreferenceInput('')
-        fetchPersonalities(token)
+        fetchPersonalities(token!)
       } catch (error) {
         console.error("Error submitting preference:", error)
         alert("Failed to submit preference. Please try again.")
@@ -329,9 +375,9 @@ export default function Component() {
 
   const toggleVoiceInput = () => {
     if (isListening) {
-      recognitionRef.current.stop()
+      recognitionRef.current?.stop()
     } else {
-      recognitionRef.current.start()
+      recognitionRef.current?.start()
       setIsListening(true)
     }
   }
