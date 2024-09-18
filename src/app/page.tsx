@@ -445,7 +445,7 @@ export default function Component() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button className="ml-2">Change Personality</Button>
+                <Button className="ml-2">Change</Button>
               </div>
 
               <div className="flex items-center">
@@ -461,12 +461,12 @@ export default function Component() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button className="ml-2">Change Character</Button>
+                <Button className="ml-2">Change</Button>
               </div>
 
               <Button onClick={clearHistory} className="bg-red-500 hover:bg-red-600">
                 <Trash2 className="h-4 w-4 mr-2" />
-                Clear History
+                Clear
               </Button>
             </div>
           </CardContent>
